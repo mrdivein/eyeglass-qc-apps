@@ -4,7 +4,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const Codes = window.QCCodes, Code128 = window.QCCode128;
 
-  let flow = null, settings = {}, view = 'flow', showClosed = false, sheetTab = 'defects', logAll = false, updateState = null;
+  let flow = null, settings = {}, view = 'flow', showClosed = false, sheetTab = 'defects', hiddenShelves = loadHidden(), logAll = false, updateState = null;
   const lastScans = [];
 
   /* ---------- feedback ---------- */
@@ -210,7 +210,7 @@
   }
   function sheetsHtml() {
     const tabs = ['defects', 'commands', 'locations'].map((t) => '<button data-sheet="' + t + '" class="' + (sheetTab === t ? 'on' : '') + '">' + t[0].toUpperCase() + t.slice(1) + '</button>').join('');
-    let body = '';
+    let body = '', picker = '';
     if (sheetTab === 'defects') {
       const pages = defectPages();
       body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>QC defects</h1>' + pg.map(areaSection).join('') + '</div>').join('');
@@ -218,14 +218,20 @@
       body = '<div class="sheet page-break"><h1>QC commands</h1><div class="codes cmd">' + Codes.COMMANDS.map((c) => codeCell(c.label.toUpperCase(), Codes.commandCode(c.key))).join('') + '</div></div>' +
         '<div class="sheet"><h1>QC verdict</h1><div class="codes cmd">' + Codes.VERDICTS.map((v) => codeCell(v.label.toUpperCase(), Codes.commandCode(v.key))).join('') + '</div></div>';
     } else {
-      const locs = flow.data.locations;
+      const shelves = shelfList();
+      const locs = flow.data.locations.filter((l) => !hiddenShelves.has(Codes.shelfOf(l)));
       const per = 8, pages = [];
       for (let i = 0; i < locs.length; i += per) pages.push(locs.slice(i, i + per));
+      picker = '<div class="toolbar">' + shelves.map((sh) => '<label><input type="checkbox" data-shelf="' + esc(sh) + '"' + (hiddenShelves.has(sh) ? '' : ' checked') + '> ' + esc(sh) + '</label>').join('') +
+        '<button data-shelves="all">All</button><button data-shelves="none">None</button><span class="muted">' + locs.length + ' codes</span></div>';
       body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>Locations</h1><div class="codes two">' +
         pg.map((l) => codeCell(l, Codes.locationCode(l))).join('') + '</div></div>').join('') || '<div class="muted">No locations. Press Sync.</div>';
     }
-    return '<div class="tabs">' + tabs + '<span class="grow"></span><button id="btnPrint" class="primary">Print</button><button id="btnPdf">Save PDF</button></div>' + body;
+    return '<div class="tabs">' + tabs + '<span class="grow"></span><button id="btnPrint" class="primary">Print</button><button id="btnPdf">Save PDF</button></div>' + picker + body;
   }
+  function shelfList() { return Array.from(new Set(flow.data.locations.map(Codes.shelfOf))).sort(); }
+  function loadHidden() { try { return new Set(JSON.parse(localStorage.getItem('hiddenShelves') || '[]')); } catch (e) { return new Set(); } }
+  function saveHidden() { try { localStorage.setItem('hiddenShelves', JSON.stringify(Array.from(hiddenShelves))); } catch (e) { /* storage unavailable */ } }
 
   /* ---------- settings ---------- */
   async function settingsDialog() {
@@ -255,6 +261,8 @@
     q('[data-cmd]', (el) => { onScan(Codes.commandCode(el.dataset.cmd)); });
     q('[data-verdict]', (el) => { onScan(Codes.commandCode(el.dataset.verdict)); });
     q('[data-sheet]', (el) => { sheetTab = el.dataset.sheet; render(); });
+    q('[data-shelf]', (el) => { if (el.checked) hiddenShelves.delete(el.dataset.shelf); else hiddenShelves.add(el.dataset.shelf); saveHidden(); render(); });
+    q('[data-shelves]', (el) => { hiddenShelves = el.dataset.shelves === 'all' ? new Set() : new Set(shelfList()); saveHidden(); render(); });
     q('[data-void]', async (el) => {
       if (!window.confirm('Delete this saved unit?')) return;
       await api.voidUnit(el.dataset.void); flow.voidSaved(el.dataset.void); flow.saved = flow.saved.filter((u) => u.id !== el.dataset.void); render();

@@ -50,6 +50,8 @@
   api.commandCode = function (cmd) { return PREFIX + '-C-' + cmd; };
   api.verdictByKey = function (k) { return VERDICTS.filter(function (v) { return v.key === k; })[0] || null; };
   api.locationCode = function (loc) { return PREFIX + '-L-' + String(loc).toUpperCase(); };
+  /* Shelf of a location: its first two dash-separated parts (or the whole name when it has fewer). */
+  api.shelfOf = function (loc) { return String(loc).split('-').slice(0, 2).join('-'); };
 
   /** Token → {type:'command',cmd} | {type:'verdict',verdict} | {type:'defect',area,defect} | {type:'location',location} | {type:'unknown'} | null (not ours). */
   api.parse = function (token) {

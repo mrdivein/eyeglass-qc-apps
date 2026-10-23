@@ -211,3 +211,10 @@ test('a verdict scan outside a unit is refused; a verdict alone counts as touche
   assert.strictEqual(f.scan(C('BACK')).kind, 'warn');
   assert.strictEqual(f.state.screen, 'UNIT');
 });
+
+test('shelfOf groups a location by its first two parts', () => {
+  const Codes = require('../src/shared/codes.js');
+  assert.equal(Codes.shelfOf('A-04-03-06-B2'), 'A-04');
+  assert.equal(Codes.shelfOf('A-03-02-01'), 'A-03');
+  assert.equal(Codes.shelfOf('DOCK'), 'DOCK');
+});
