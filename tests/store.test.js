@@ -59,3 +59,14 @@ test('draft survives reopening the store and is replaced atomically', () => {
   assert.deepStrictEqual(new Store(dir).draft(), { shipmentId: 'LOT-1', unit: { upc: '1' } });
   assert.strictEqual(fs.existsSync(path.join(dir, 'draft.json.tmp')), false);
 });
+
+test('scan log is written line by line into a file per day', () => {
+  const dir = tmp(); const s = new Store(dir);
+  const t = new Date(2026, 9, 23, 10, 0, 0).getTime();
+  s.logScan({ t, token: 'A', screen: 'SCAN' }); s.logScan({ t: t + 1000, token: 'B', screen: 'UNIT' });
+  s.logScan({ t: t + 86400000, token: 'C', screen: 'SCAN' });
+  const files = fs.readdirSync(path.join(dir, 'logs')).sort();
+  assert.deepStrictEqual(files, ['scans-2026-10-23.jsonl', 'scans-2026-10-24.jsonl']);
+  const lines = fs.readFileSync(path.join(dir, 'logs', files[0]), 'utf8').trim().split('\n').map(JSON.parse);
+  assert.deepStrictEqual(lines.map((l) => l.token), ['A', 'B']);
+});

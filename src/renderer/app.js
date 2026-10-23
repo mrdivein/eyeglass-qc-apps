@@ -61,6 +61,7 @@
     const st = flow.state;
     const before = st.screen;
     const m = flow.scan(tok);
+    api.logScan({ t: Date.now(), token: tok, screen: before, shipment: flow.state.shipmentId, kind: m ? m.kind : '', text: m ? m.text : '' }).catch(() => {});
     lastScans.unshift({ tok: tok, kind: m ? m.kind : 'info', t: new Date() });
     lastScans.length = Math.min(lastScans.length, 8);
     showMsg(m);
@@ -186,23 +187,23 @@
   }
 
   /* ---------- printable code sheets (barcodes only, no instruction text) ---------- */
-  function codeCell(label, text) { return '<div class="code"><div class="lab">' + esc(label) + '</div>' + Code128.svg(text, { module: 3, height: 80 }) + '</div>'; }
+  function codeCell(label, text) { return '<div class="code"><div class="lab">' + esc(label) + '</div>' + Code128.svg(text, { module: 4, height: 110 }) + '</div>'; }
   function areaSection(sec) {
     return '<h2>' + esc(sec.area.label) + '</h2><div class="codes">' + sec.items.map((d) => codeCell(d, Codes.defectCode(sec.area.key, d))).join('') + '</div>';
   }
-  /* Codes are packed into pages of PAGE_ROWS rows (2 codes per row, an area heading counts as 1 row); an area continues on the next page. */
-  const PAGE_ROWS = 8;
+  /* One code per row, as large as the page allows. A page holds PAGE_BUDGET units: a code costs 1, an area heading 0.5; an area continues on the next page. */
+  const PAGE_BUDGET = 5.5;
   function defectPages() {
     const pages = [[]];
     let used = 0;
     Codes.AREAS.forEach((a) => {
       let left = Codes.DEFECTS[a.key].slice();
       while (left.length) {
-        let room = PAGE_ROWS - used - 1;
-        if (room < 1) { pages.push([]); used = 0; room = PAGE_ROWS - 1; }
-        const take = left.splice(0, room * 2);
+        let room = Math.floor(PAGE_BUDGET - used - 0.5);
+        if (room < 1) { pages.push([]); used = 0; room = Math.floor(PAGE_BUDGET - 0.5); }
+        const take = left.splice(0, room);
         pages[pages.length - 1].push({ area: a, items: take });
-        used += 1 + Math.ceil(take.length / 2);
+        used += 0.5 + take.length;
       }
     });
     return pages;
@@ -218,9 +219,9 @@
         '<div class="sheet"><h1>QC verdict</h1><div class="codes cmd">' + Codes.VERDICTS.map((v) => codeCell(v.label.toUpperCase(), Codes.commandCode(v.key))).join('') + '</div></div>';
     } else {
       const locs = flow.data.locations;
-      const per = 24, pages = [];
+      const per = 8, pages = [];
       for (let i = 0; i < locs.length; i += per) pages.push(locs.slice(i, i + per));
-      body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>Locations</h1><div class="codes three">' +
+      body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>Locations</h1><div class="codes two">' +
         pg.map((l) => codeCell(l, Codes.locationCode(l))).join('') + '</div></div>').join('') || '<div class="muted">No locations. Press Sync.</div>';
     }
     return '<div class="tabs">' + tabs + '<span class="grow"></span><button id="btnPrint" class="primary">Print</button><button id="btnPdf">Save PDF</button></div>' + body;

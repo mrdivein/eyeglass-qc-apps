@@ -14,9 +14,14 @@ class Store {
   readJson(name, fallback) {
     try { return JSON.parse(fs.readFileSync(path.join(this.dir, name), 'utf8')); } catch (e) { return fallback; }
   }
+  /** Write the file to disk (fsync) before returning, so a power cut right after cannot lose it. */
+  durableWrite(file, data, flag) {
+    const fd = fs.openSync(file, flag);
+    try { fs.writeSync(fd, data); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  }
   writeJson(name, obj) {
     const f = path.join(this.dir, name), tmp = f + '.tmp';
-    fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
+    this.durableWrite(tmp, JSON.stringify(obj, null, 2), 'w');
     fs.renameSync(tmp, f);
   }
 
@@ -28,7 +33,17 @@ class Store {
   draft() { return this.readJson('draft.json', null); }
   saveDraft(d) { this.writeJson('draft.json', d); }
 
-  append(ev) { fs.appendFileSync(this.unitsFile, JSON.stringify(ev) + '\n'); }
+  append(ev) { this.durableWrite(this.unitsFile, JSON.stringify(ev) + '\n', 'a'); }
+
+  /** Every scan, in order, one JSON line per scan, one file per day (logs/scans-YYYY-MM-DD.jsonl). */
+  logScan(ev) {
+    const dir = path.join(this.dir, 'logs');
+    fs.mkdirSync(dir, { recursive: true });
+    const day = new Date(ev.t || Date.now());
+    const p = (n) => String(n).padStart(2, '0');
+    const name = 'scans-' + day.getFullYear() + '-' + p(day.getMonth() + 1) + '-' + p(day.getDate()) + '.jsonl';
+    this.durableWrite(path.join(dir, name), JSON.stringify(ev) + '\n', 'a');
+  }
   saveUnit(rec) { this.append({ op: 'save', rec: rec }); }
   voidUnit(id) { this.append({ op: 'void', id: id, at: new Date().toISOString() }); }
   markExported(ids, batch) { this.append({ op: 'exported', ids: ids, batch: batch, at: new Date().toISOString() }); }
