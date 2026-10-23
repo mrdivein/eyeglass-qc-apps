@@ -218,3 +218,14 @@ test('shelfOf groups a location by its first two parts', () => {
   assert.equal(Codes.shelfOf('A-03-02-01'), 'A-03');
   assert.equal(Codes.shelfOf('DOCK'), 'DOCK');
 });
+
+test('byLocation counts pieces per location with a verdict split', () => {
+  const { byLocation } = require('../src/shared/flow.js');
+  const r = byLocation([
+    { location: 'B', verdict: 'PASS', result: 'PASS' }, { location: 'A', verdict: 'DEFECT', result: 'ISSUE' },
+    { location: 'B', verdict: 'POLISH', result: 'ISSUE' }, { location: 'B', result: 'PASS' }, { verdict: 'PASS' }
+  ]);
+  assert.deepEqual(r.map((o) => o.location), ['(none)', 'A', 'B']);
+  assert.deepEqual(r[2], { location: 'B', pcs: 3, pass: 2, polish: 1, defect: 0 });
+  assert.equal(r[1].defect, 1);
+});

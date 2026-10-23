@@ -217,5 +217,18 @@
     }
   }
 
-  return { Flow: Flow, normUpc: normUpc };
+  /** Pieces per location with a split by verdict, sorted by location: [{location, pcs, pass, polish, defect}]. */
+  function byLocation(units) {
+    const m = {};
+    units.forEach(function (u) {
+      const k = u.location || '(none)';
+      const o = m[k] || (m[k] = { location: k, pcs: 0, pass: 0, polish: 0, defect: 0 });
+      o.pcs += 1;
+      const v = u.verdict || (u.result === 'PASS' ? 'PASS' : '');
+      if (v === 'PASS') o.pass += 1; else if (v === 'POLISH') o.polish += 1; else if (v === 'DEFECT') o.defect += 1;
+    });
+    return Object.keys(m).sort().map(function (k) { return m[k]; });
+  }
+
+  return { Flow: Flow, normUpc: normUpc, byLocation: byLocation };
 });

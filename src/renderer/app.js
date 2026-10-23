@@ -110,7 +110,8 @@
     $('crumbs').textContent = st.shipmentId ? (flow.current.name || st.shipmentId) : '';
     const lp = $('locPill');
     lp.hidden = !st.shipmentId;
-    lp.textContent = st.location ? 'Location ' + st.location : 'No location';
+    const inLoc = st.location ? flow.saved.filter((u) => u.location === st.location).length : 0;
+    lp.textContent = st.location ? 'Location ' + st.location + ' \u00b7 ' + inLoc + ' pcs' : 'No location';
     lp.className = 'pill' + (st.location ? '' : ' bad');
     const c = flow.data.syncedAt;
     $('syncInfo').textContent = c ? 'Synced ' + new Date(c).toLocaleString() : 'Not synced';
@@ -203,10 +204,14 @@
     const rows = us.map((u) => '<tr><td>' + esc(new Date(u.savedAt).toLocaleString()) + '</td><td>' + esc(u.shipment) + '</td><td>' + esc(u.upc) + '</td><td>' + esc(u.sku) +
       '</td><td>' + esc(u.serial) + '</td><td>' + esc(u.verdict || u.result) + '</td><td>' + esc(u.note) + '</td><td>' + esc(u.location) +
       '</td><td>' + (u.exportedBatch ? 'exported' : '') + '</td><td><button class="danger" data-void="' + esc(u.id) + '">Delete</button></td></tr>').join('');
+    const locs = window.QCFlow.byLocation(flow.saved);
+    const locRows = locs.map((o) => '<tr><td>' + esc(o.location) + '</td><td class="num"><b>' + o.pcs + '</b></td><td class="num">' + o.pass + '</td><td class="num">' + o.polish + '</td><td class="num">' + o.defect + '</td></tr>').join('');
+    const locCard = locs.length ? '<div class="card" style="padding:0;margin-bottom:12px"><table><thead><tr><th>Location</th><th class="num">pcs</th><th class="num">Pass</th><th class="num">Hold</th><th class="num">Defect</th></tr></thead><tbody>' + locRows +
+      '<tr><td><b>Total</b></td><td class="num"><b>' + flow.saved.length + '</b></td><td class="num">' + locs.reduce((a, o) => a + o.pass, 0) + '</td><td class="num">' + locs.reduce((a, o) => a + o.polish, 0) + '</td><td class="num">' + locs.reduce((a, o) => a + o.defect, 0) + '</td></tr></tbody></table></div>' : '';
     return '<div class="toolbar"><button id="btnCopy" class="primary">Copy rows</button><button id="btnFile">Save CSV</button>' +
       '<label><input type="checkbox" id="chkAll"' + (logAll ? ' checked' : '') + '> Include exported</label>' +
       '<span class="grow"></span><span class="muted">' + flow.saved.length + ' saved</span></div>' +
-      '<div class="card" style="padding:0"><table><thead><tr><th>Time</th><th>Shipment</th><th>UPC</th><th>SKU</th><th>S/N</th><th>Result</th><th>Defects</th><th>Location</th><th></th><th></th></tr></thead><tbody>' +
+      locCard + '<div class="card" style="padding:0"><table><thead><tr><th>Time</th><th>Shipment</th><th>UPC</th><th>SKU</th><th>S/N</th><th>Result</th><th>Defects</th><th>Location</th><th></th><th></th></tr></thead><tbody>' +
       (rows || '<tr><td colspan="10" class="muted">Nothing saved yet</td></tr>') + '</tbody></table></div>';
   }
 
