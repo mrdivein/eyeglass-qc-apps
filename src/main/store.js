@@ -25,6 +25,9 @@ class Store {
   cache() { return this.readJson('cache.json', null); }
   saveCache(c) { this.writeJson('cache.json', c); }
 
+  draft() { return this.readJson('draft.json', null); }
+  saveDraft(d) { this.writeJson('draft.json', d); }
+
   append(ev) { fs.appendFileSync(this.unitsFile, JSON.stringify(ev) + '\n'); }
   saveUnit(rec) { this.append({ op: 'save', rec: rec }); }
   voidUnit(id) { this.append({ op: 'void', id: id, at: new Date().toISOString() }); }

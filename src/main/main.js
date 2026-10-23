@@ -43,6 +43,8 @@ function register() {
   ipcMain.handle('data:sync', async () => {
     try { return { ok: true, data: await sync() }; } catch (e) { return { ok: false, error: String(e.message || e), data: store.cache() }; }
   });
+  ipcMain.handle('draft:get', () => store.draft());
+  ipcMain.handle('draft:set', (_e, d) => { store.saveDraft(d); return true; });
   ipcMain.handle('units:list', () => store.units());
   ipcMain.handle('units:save', (_e, rec) => { store.saveUnit(rec); return true; });
   ipcMain.handle('units:void', (_e, id) => { store.voidUnit(id); return true; });

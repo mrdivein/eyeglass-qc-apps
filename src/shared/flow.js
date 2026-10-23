@@ -173,6 +173,31 @@
       return this.msg('ok', 'Saved ' + u.line.model + (issue ? ' (ISSUE)' : ' (PASS)'));
     }
 
+    /** Unfinished work as plain data (written to disk after every scan so a power cut loses nothing). */
+    snapshot() {
+      const st = this.state, u = st.unit;
+      return {
+        shipmentId: st.shipmentId, location: st.location,
+        unit: u ? { upc: u.upc, serial: u.serial, defects: u.defects.slice() } : null
+      };
+    }
+
+    /** Put the app back where a snapshot left it. Returns true when something was restored. */
+    restore(snap) {
+      if (!snap || !snap.shipmentId || !this.shipment(snap.shipmentId)) return false;
+      this.state.location = snap.location || '';
+      this.openShipment(snap.shipmentId);
+      const line = snap.unit && this.findLine(snap.unit.upc);
+      if (line) {
+        this.state.unit = { upc: line.upc, line: line, serial: snap.unit.serial || '', defects: (snap.unit.defects || []).filter(function (d) { return Codes.areaByKey(d.area); }) };
+        this.state.screen = 'UNIT';
+        this.msg('warn', 'Restored your unfinished unit - SAVE or REDO');
+      } else {
+        this.msg('info', 'Restored ' + snap.shipmentId);
+      }
+      return true;
+    }
+
     /** Remove a saved unit (UI action, e.g. wrong scan). */
     voidSaved(id) {
       const i = this.saved.findIndex(function (u) { return u.id === id; });

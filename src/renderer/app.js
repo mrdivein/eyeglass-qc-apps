@@ -40,6 +40,7 @@
       save: (rec) => { api.saveUnit(rec); }
     });
     api.onUpdate((s) => { updateState = s; renderUpdate(); });
+    try { if (flow.restore(await api.getDraft())) showMsg(flow.state.message); } catch (e) { /* no usable draft */ }
     render();
     if (!settings.apiUrl || !settings.apiKey) { settingsDialog(); } else sync(true);
   }
@@ -83,7 +84,14 @@
   setInterval(keepFocus, 1500);
 
   /* ---------- render ---------- */
+  let lastDraft = '';
+  function persistDraft() {
+    const d = JSON.stringify(flow.snapshot());
+    if (d !== lastDraft) { lastDraft = d; api.setDraft(JSON.parse(d)).catch(() => {}); }
+  }
+
   function render() {
+    persistDraft();
     const st = flow.state;
     $('crumbs').textContent = st.shipmentId ? (flow.current.name || st.shipmentId) : '';
     const lp = $('locPill');

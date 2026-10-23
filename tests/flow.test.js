@@ -159,3 +159,23 @@ test('result values come from the configured hooks', () => {
   f.scan('100000000001'); f.scan(D('LENS', 'Scratch')); f.scan(C('SAVE'));
   assert.deepStrictEqual(out.map((r) => [r.result, r.condition]), [['GOOD', 'FREE'], ['BAD', 'KEEP']]);
 });
+
+test('snapshot and restore bring back shipment, location and the unfinished unit', () => {
+  const { f } = setup();
+  f.scan('100000000001'); f.scan('SN-9'); f.scan(D('LENS', 'Scratch')); f.scan('LOC-02');
+  const snap = JSON.parse(JSON.stringify(f.snapshot()));
+  const g = new Flow(data(), [], {});
+  assert.strictEqual(g.restore(snap), true);
+  assert.deepStrictEqual([g.state.screen, g.state.shipmentId, g.state.location, g.state.unit.serial, g.state.unit.defects.length], ['UNIT', 'LOT-1', 'LOC-02', 'SN-9', 1]);
+  assert.strictEqual(g.scan(C('SAVE')).kind, 'ok');
+});
+
+test('restore without a unit lands on the scan screen; stale or empty snapshots are ignored', () => {
+  const { f } = setup();
+  f.scan('LOC-01');
+  const g = new Flow(data(), [], {});
+  assert.strictEqual(g.restore(f.snapshot()), true);
+  assert.deepStrictEqual([g.state.screen, g.state.location], ['SCAN', 'LOC-01']);
+  assert.strictEqual(new Flow(data(), [], {}).restore({ shipmentId: 'GONE' }), false);
+  assert.strictEqual(new Flow(data(), [], {}).restore(null), false);
+});

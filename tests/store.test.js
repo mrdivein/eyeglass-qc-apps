@@ -51,3 +51,11 @@ test('export without a config falls back to generic columns; unknown fields are 
   assert.deepStrictEqual(r, [['100000000001']]);
   assert.strictEqual(X.rows([rec('1', '2026-10-23T03:00:00.000Z')], 0)[0].length, X.FIELDS.length);
 });
+
+test('draft survives reopening the store and is replaced atomically', () => {
+  const dir = tmp(); const s = new Store(dir);
+  assert.strictEqual(s.draft(), null);
+  s.saveDraft({ shipmentId: 'LOT-1', unit: null }); s.saveDraft({ shipmentId: 'LOT-1', unit: { upc: '1' } });
+  assert.deepStrictEqual(new Store(dir).draft(), { shipmentId: 'LOT-1', unit: { upc: '1' } });
+  assert.strictEqual(fs.existsSync(path.join(dir, 'draft.json.tmp')), false);
+});

@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('qcApi', {
   setSettings: call('settings:set'),
   cached: call('data:cached'),
   sync: call('data:sync'),
+  getDraft: call('draft:get'),
+  setDraft: call('draft:set'),
   units: call('units:list'),
   saveUnit: call('units:save'),
   voidUnit: call('units:void'),
