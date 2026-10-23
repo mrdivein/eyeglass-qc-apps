@@ -151,8 +151,17 @@
     }).join('');
     const recent = lastScans.map((x) => '<span class="tag">' + esc(x.tok) + '</span>').join(' ');
     const p = flow.shipmentProgress(s);
-    return '<div class="scanbig"><div class="big">Scan UPC</div><div class="muted">' + p.done + ' / ' + p.qty + ' pcs</div></div>' +
+    return '<div class="scanbig"><div class="big">Scan UPC</div><div class="muted">' + p.done + ' / ' + p.qty + ' pcs</div><div class="locrow">Location ' + locPickHtml() + '</div></div>' +
       '<div class="card" style="padding:0"><table><thead><tr><th>Brand</th><th>Model</th><th>Color</th><th>Type</th><th>UPC</th><th class="num">Checked</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  /* Manual alternative to scanning a location: a list grouped by shelf. */
+  function locPickHtml() {
+    const cur = flow.state.location;
+    const groups = {};
+    flow.data.locations.forEach((l) => { (groups[Codes.shelfOf(l)] = groups[Codes.shelfOf(l)] || []).push(l); });
+    const opts = Object.keys(groups).sort().map((g) => '<optgroup label="' + esc(g) + '">' + groups[g].map((l) => '<option' + (l.toUpperCase() === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</optgroup>').join('');
+    return '<select id="locPick" class="locpick"><option value=""' + (cur ? '' : ' selected') + '>Pick location</option>' + opts + '</select>';
   }
 
   function unitHtml() {
@@ -169,7 +178,7 @@
       '<dl><dt>SKU</dt><dd>' + esc(l.sku) + '</dd><dt>Color</dt><dd>' + esc(l.color) + '</dd><dt>Type</dt><dd>' + esc(l.type) + '</dd><dt>UPC</dt><dd>' + esc(l.upc) + '</dd></dl>' +
       '<div class="count' + (over ? ' over' : '') + '">Checked ' + d + ' / ' + l.qty + '</div></div>' +
       '<div class="card"><div class="field"><label>S/N</label><div class="val' + (u.serial ? '' : ' empty') + '">' + esc(u.serial || 'scan S/N') + '</div></div>' +
-      '<div class="field"><label>Location</label><div class="val' + (flow.state.location ? '' : ' empty') + '">' + esc(flow.state.location || 'scan location') + '</div></div>' +
+      '<div class="field"><label>Location</label><div class="val' + (flow.state.location ? '' : ' empty') + '">' + esc(flow.state.location || 'scan location') + '</div>' + locPickHtml() + '</div>' +
       '<div class="areas">' + areas + '</div>' +
       '<div class="verdicts' + (needVerdict ? ' need' : '') + '">' + verdicts + '</div>' +
       '<div class="btns"><button class="primary" data-cmd="SAVE">Save</button><button data-cmd="BACK">Back</button><button data-cmd="REDO">Redo</button><button data-cmd="UNDO">Undo</button></div></div></div>';
@@ -262,6 +271,8 @@
     q('[data-ship]', (el) => { showMsg(flow.openShipment(el.dataset.ship)); render(); });
     q('[data-cmd]', (el) => { onScan(Codes.commandCode(el.dataset.cmd)); });
     q('[data-verdict]', (el) => { onScan(Codes.commandCode(el.dataset.verdict)); });
+    const lp = $('locPick');
+    if (lp) lp.onchange = () => { const v = lp.value; lp.blur(); if (v) onScan(Codes.locationCode(v)); setTimeout(keepFocus, 0); };
     q('[data-sheet]', (el) => { sheetTab = el.dataset.sheet; render(); });
     q('[data-shelf]', (el) => { if (el.checked) hiddenShelves.delete(el.dataset.shelf); else hiddenShelves.add(el.dataset.shelf); saveHidden(); render(); });
     q('[data-shelves]', (el) => { hiddenShelves = el.dataset.shelves === 'all' ? new Set() : new Set(shelfList()); saveHidden(); render(); });
