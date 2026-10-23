@@ -20,11 +20,17 @@
   }
   const SOUND = { ok: () => tone(1000, 90), info: () => tone(700, 60), warn: () => { tone(500, 90); tone(500, 90, 0.14); }, err: () => tone(180, 350) };
 
-  function showMsg(m) {
+  /* Verdicts get their own sound so a wrong scan is heard without looking: pass = rising pair, hold = one long mid tone, defect = three low beeps. */
+  const VERDICT_SOUND = {
+    PASS: () => { tone(900, 90); tone(1300, 130, 0.12); },
+    POLISH: () => tone(620, 380),
+    DEFECT: () => { tone(240, 130); tone(240, 130, 0.2); tone(240, 130, 0.4); }
+  };
+  function showMsg(m, sound) {
     if (!m) return;
     const el = $('msg');
     el.className = 'msg ' + m.kind; el.textContent = m.text;
-    (SOUND[m.kind] || SOUND.info)();
+    (sound || SOUND[m.kind] || SOUND.info)();
   }
   function setMsg(kind, text) { showMsg({ kind: kind, text: text }); }
 
@@ -64,7 +70,9 @@
     api.logScan({ t: Date.now(), token: tok, screen: before, shipment: flow.state.shipmentId, kind: m ? m.kind : '', text: m ? m.text : '' }).catch(() => {});
     lastScans.unshift({ tok: tok, kind: m ? m.kind : 'info', t: new Date() });
     lastScans.length = Math.min(lastScans.length, 8);
-    showMsg(m);
+    const p = Codes.parse(tok);
+    const verdictHeard = p && p.type === 'verdict' && flow.state.unit && flow.state.unit.verdict === p.verdict ? VERDICT_SOUND[p.verdict] : null;
+    showMsg(m, verdictHeard);
     if (view !== 'flow') view = 'flow';
     render();
     return before;
@@ -83,6 +91,8 @@
   }
   document.addEventListener('click', () => setTimeout(keepFocus, 0));
   setInterval(keepFocus, 1500);
+  window.addEventListener('focus', () => setTimeout(keepFocus, 0));
+  $('dlg').addEventListener('close', () => setTimeout(keepFocus, 0));
 
   /* ---------- render ---------- */
   let lastDraft = '';
@@ -244,6 +254,19 @@
   function loadHidden() { try { return new Set(JSON.parse(localStorage.getItem('hiddenShelves') || '[]')); } catch (e) { return new Set(); } }
   function saveHidden() { try { localStorage.setItem('hiddenShelves', JSON.stringify(Array.from(hiddenShelves))); } catch (e) { /* storage unavailable */ } }
 
+  /* In-page confirmation: window.confirm() leaves text inputs unable to take focus in Electron on Windows, which stopped scanning. */
+  function confirmDialog(text) {
+    return new Promise((resolve) => {
+      const d = $('dlg');
+      d.innerHTML = '<h2>' + esc(text) + '</h2><div class="row"><button id="cNo">Cancel</button><button id="cYes" class="primary">Delete</button></div>';
+      const done = (v) => { d.close(); keepFocus(); resolve(v); };
+      $('cNo').onclick = () => done(false);
+      $('cYes').onclick = () => done(true);
+      d.oncancel = () => resolve(false);
+      d.showModal();
+    });
+  }
+
   /* ---------- settings ---------- */
   async function settingsDialog() {
     const info = await api.info();
@@ -277,7 +300,7 @@
     q('[data-shelf]', (el) => { if (el.checked) hiddenShelves.delete(el.dataset.shelf); else hiddenShelves.add(el.dataset.shelf); saveHidden(); render(); });
     q('[data-shelves]', (el) => { hiddenShelves = el.dataset.shelves === 'all' ? new Set() : new Set(shelfList()); saveHidden(); render(); });
     q('[data-void]', async (el) => {
-      if (!window.confirm('Delete this saved unit?')) return;
+      if (!(await confirmDialog('Delete this saved unit?'))) return;
       await api.voidUnit(el.dataset.void); flow.voidSaved(el.dataset.void); flow.saved = flow.saved.filter((u) => u.id !== el.dataset.void); render();
     });
     const b = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
