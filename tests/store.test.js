@@ -70,3 +70,11 @@ test('scan log is written line by line into a file per day', () => {
   const lines = fs.readFileSync(path.join(dir, 'logs', files[0]), 'utf8').trim().split('\n').map(JSON.parse);
   assert.deepStrictEqual(lines.map((l) => l.token), ['A', 'B']);
 });
+
+test('an edit survives reopening the store and marks the record as edited', () => {
+  const dir = tmp(); const a = new Store(dir);
+  a.saveUnit(rec('1', '2026-10-23T03:00:00.000Z'));
+  a.editUnit('1', { location: 'LOC-09', serial: 'SN7' });
+  const u = new Store(dir).units()[0];
+  assert.equal(u.location, 'LOC-09'); assert.equal(u.serial, 'SN7'); assert.equal(u.edited, true);
+});

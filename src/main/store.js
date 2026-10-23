@@ -46,6 +46,7 @@ class Store {
   }
   saveUnit(rec) { this.append({ op: 'save', rec: rec }); }
   voidUnit(id) { this.append({ op: 'void', id: id, at: new Date().toISOString() }); }
+  editUnit(id, patch) { this.append({ op: 'edit', id: id, patch: patch, at: new Date().toISOString() }); }
   markExported(ids, batch) { this.append({ op: 'exported', ids: ids, batch: batch, at: new Date().toISOString() }); }
 
   /** Fold the log into current records: voided ones are marked, exported ones carry their batch name. */
@@ -58,6 +59,7 @@ class Store {
       let ev; try { ev = JSON.parse(line); } catch (e) { return; }   // a half-written last line is skipped
       if (ev.op === 'save' && ev.rec && !byId[ev.rec.id]) { byId[ev.rec.id] = Object.assign({}, ev.rec); order.push(ev.rec.id); }
       else if (ev.op === 'void' && byId[ev.id]) byId[ev.id].voided = true;
+      else if (ev.op === 'edit' && byId[ev.id]) { Object.assign(byId[ev.id], ev.patch || {}); byId[ev.id].edited = true; }
       else if (ev.op === 'exported') (ev.ids || []).forEach(function (id) { if (byId[id]) byId[id].exportedBatch = ev.batch; });
     });
     return order.map(function (id) { return byId[id]; });

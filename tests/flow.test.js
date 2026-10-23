@@ -229,3 +229,20 @@ test('byLocation counts pieces per location with a verdict split', () => {
   assert.deepEqual(r[2], { location: 'B', pcs: 3, pass: 2, polish: 1, defect: 0 });
   assert.equal(r[1].defect, 1);
 });
+
+test('location search and editing of saved units', () => {
+  const f = new Flow({ shipments: [], locations: ['A-04-02-01-B1', 'A-04-03-01-B1', 'A-04-03-01-B2', 'HOLD'] }, [
+    { id: 'u1', shipment: 'S', serial: 'SN1', location: 'HOLD', verdict: 'PASS', result: 'PASS', condition: 'OK', note: '' },
+    { id: 'u2', shipment: 'S', serial: 'SN2', location: 'HOLD', verdict: 'PASS', result: 'PASS', condition: 'OK', note: '' }
+  ], { values: { DEFECT: { result: 'ISSUE', condition: 'DAMAGED' } } });
+  assert.deepEqual(f.matchLocations('a0403').length, 2);
+  assert.equal(f.resolveLocation('a-04-02'), 'A-04-02-01-B1');
+  assert.equal(f.resolveLocation('a-04-03'), null);
+  assert.equal(f.resolveLocation('hold'), 'HOLD');
+  assert.equal(f.editSaved('u1', { location: 'zz' }).ok, false);
+  assert.equal(f.editSaved('u1', { serial: 'SN2' }).ok, false);
+  const r = f.editSaved('u1', { location: 'a-04-03-01-b2', serial: ' SN9 ', verdict: 'DEFECT', note: 'Scratch: Lens' });
+  assert.deepEqual(r.patch, { location: 'A-04-03-01-B2', serial: 'SN9', verdict: 'DEFECT', result: 'ISSUE', condition: 'DAMAGED', note: 'Scratch: Lens' });
+  assert.equal(f.saved[0].location, 'A-04-03-01-B2');
+  assert.deepEqual(f.editSaved('u1', {}).patch, {});
+});

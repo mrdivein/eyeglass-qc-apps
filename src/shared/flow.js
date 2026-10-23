@@ -39,6 +39,20 @@
       s.lines.forEach(function (l) { qty += l.qty; done += (l.received || 0) + self.savedCount(s.id, l.upc); });
       return { qty: qty, done: done };
     }
+    /** Locations containing the typed text (case-insensitive, dashes and spaces ignored), for search-as-you-type. */
+    matchLocations(text) {
+      const norm = function (x) { return String(x).toUpperCase().replace(/[\s-]+/g, ''); };
+      const q = norm(text);
+      if (!q) return [];
+      return this.data.locations.filter(function (l) { return norm(l).indexOf(q) >= 0; });
+    }
+    /** Exact location, else the only location matching the text, else null. */
+    resolveLocation(text) {
+      const exact = this.knownLocation(text);
+      if (exact) return exact;
+      const m = this.matchLocations(text);
+      return m.length === 1 ? m[0] : null;
+    }
     knownLocation(tok) {
       const t = String(tok).trim().toUpperCase();
       return this.data.locations.filter(function (l) { return String(l).toUpperCase() === t; })[0] || null;
@@ -208,6 +222,34 @@
         this.msg('info', 'Restored ' + snap.shipmentId);
       }
       return true;
+    }
+
+    /** Change fields of a saved unit: {location, serial, verdict, note}. Returns {ok, patch} or {ok:false, error}. */
+    editSaved(id, f) {
+      const u = this.saved.find(function (x) { return x.id === id; });
+      if (!u) return { ok: false, error: 'Unit not found' };
+      const patch = {};
+      if (f.location !== undefined) {
+        const loc = this.resolveLocation(f.location);
+        if (!loc) return { ok: false, error: 'Location "' + String(f.location).trim() + '" is not in the location list' };
+        if (loc !== u.location) patch.location = loc;
+      }
+      if (f.serial !== undefined) {
+        const sn = String(f.serial).trim();
+        if (sn !== (u.serial || '')) {
+          const dup = this.saved.filter(function (x) { return x.id !== id && x.serial && x.serial === sn; })[0];
+          if (sn && dup) return { ok: false, error: 'S/N ' + sn + ' already saved (' + dup.shipment + ')' };
+          patch.serial = sn;
+        }
+      }
+      if (f.verdict !== undefined && f.verdict !== u.verdict) {
+        if (!Codes.verdictByKey(f.verdict)) return { ok: false, error: 'Unknown verdict' };
+        const v = (this.hooks.values && this.hooks.values[f.verdict]) || DEFAULT_VALUES[f.verdict];
+        patch.verdict = f.verdict; patch.result = v.result; patch.condition = v.condition;
+      }
+      if (f.note !== undefined && String(f.note).trim() !== (u.note || '')) patch.note = String(f.note).trim();
+      Object.assign(u, patch);
+      return { ok: true, patch: patch };
     }
 
     /** Remove a saved unit (UI action, e.g. wrong scan). */

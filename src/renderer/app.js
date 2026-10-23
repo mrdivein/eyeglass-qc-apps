@@ -169,13 +169,10 @@
       '<div class="card" style="padding:0"><table><thead><tr><th>Brand</th><th>Model</th><th>Color</th><th>Type</th><th>UPC</th><th class="num">Checked</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
   }
 
-  /* Manual alternative to scanning a location: a list grouped by shelf. */
+  /* Manual alternative to scanning a location: type to search the list, or pick from it. */
+  function locListHtml() { return '<datalist id="locList">' + flow.data.locations.map((l) => '<option value="' + esc(l) + '">').join('') + '</datalist>'; }
   function locPickHtml() {
-    const cur = flow.state.location;
-    const groups = {};
-    flow.data.locations.forEach((l) => { (groups[Codes.shelfOf(l)] = groups[Codes.shelfOf(l)] || []).push(l); });
-    const opts = Object.keys(groups).sort().map((g) => '<optgroup label="' + esc(g) + '">' + groups[g].map((l) => '<option' + (l.toUpperCase() === cur ? ' selected' : '') + '>' + esc(l) + '</option>').join('') + '</optgroup>').join('');
-    return '<select id="locPick" class="locpick"><option value=""' + (cur ? '' : ' selected') + '>Pick location</option>' + opts + '</select>';
+    return '<input id="locPick" class="locpick" type="text" list="locList" autocomplete="off" spellcheck="false" placeholder="Type to search location" value="">' + locListHtml();
   }
 
   function unitHtml() {
@@ -203,7 +200,7 @@
     const us = flow.saved.slice().reverse().filter((u) => logAll || !u.exportedBatch);
     const rows = us.map((u) => '<tr><td>' + esc(new Date(u.savedAt).toLocaleString()) + '</td><td>' + esc(u.shipment) + '</td><td>' + esc(u.upc) + '</td><td>' + esc(u.sku) +
       '</td><td>' + esc(u.serial) + '</td><td>' + esc(u.verdict || u.result) + '</td><td>' + esc(u.note) + '</td><td>' + esc(u.location) +
-      '</td><td>' + (u.exportedBatch ? 'exported' : '') + '</td><td><button class="danger" data-void="' + esc(u.id) + '">Delete</button></td></tr>').join('');
+      '</td><td>' + (u.exportedBatch ? 'exported' : '') + (u.edited ? (u.exportedBatch ? ' \u00b7 ' : '') + 'edited' : '') + '</td><td><button data-edit="' + esc(u.id) + '">Edit</button> <button class="danger" data-void="' + esc(u.id) + '">Delete</button></td></tr>').join('');
     const locs = window.QCFlow.byLocation(flow.saved);
     const locRows = locs.map((o) => '<tr><td>' + esc(o.location) + '</td><td class="num"><b>' + o.pcs + '</b></td><td class="num">' + o.pass + '</td><td class="num">' + o.polish + '</td><td class="num">' + o.defect + '</td></tr>').join('');
     const locCard = locs.length ? '<div class="card" style="padding:0;margin-bottom:12px"><table><thead><tr><th>Location</th><th class="num">pcs</th><th class="num">Pass</th><th class="num">Hold</th><th class="num">Defect</th></tr></thead><tbody>' + locRows +
@@ -262,6 +259,30 @@
   function loadHidden() { try { return new Set(JSON.parse(localStorage.getItem('hiddenShelves') || '[]')); } catch (e) { return new Set(); } }
   function saveHidden() { try { localStorage.setItem('hiddenShelves', JSON.stringify(Array.from(hiddenShelves))); } catch (e) { /* storage unavailable */ } }
 
+  /* Change a saved unit (location above all). The location box searches as you type. */
+  function editDialog(id) {
+    const u = flow.saved.find((x) => x.id === id);
+    if (!u) return;
+    const d = $('dlg');
+    const vopts = Codes.VERDICTS.map((v) => '<option value="' + v.key + '"' + (v.key === (u.verdict || 'PASS') ? ' selected' : '') + '>' + esc(v.label) + '</option>').join('');
+    d.innerHTML = '<h2>Edit saved unit</h2><div class="muted">' + esc(u.sku) + '</div>' +
+      '<label>Location</label><input type="text" id="eLoc" list="locList" autocomplete="off" spellcheck="false" value="' + esc(u.location) + '">' + locListHtml() +
+      '<label>S/N</label><input type="text" id="eSn" autocomplete="off" spellcheck="false" value="' + esc(u.serial) + '">' +
+      '<label>Result</label><select id="eVer">' + vopts + '</select>' +
+      '<label>Defects</label><input type="text" id="eNote" autocomplete="off" value="' + esc(u.note) + '">' +
+      '<div class="err" id="eErr"></div>' +
+      '<div class="row"><button id="eCancel">Cancel</button><button id="eSave" class="primary">Save changes</button></div>';
+    d.showModal();
+    $('eLoc').select();
+    $('eCancel').onclick = () => { d.close(); };
+    $('eSave').onclick = async () => {
+      const r = flow.editSaved(id, { location: $('eLoc').value, serial: $('eSn').value, verdict: $('eVer').value, note: $('eNote').value });
+      if (!r.ok) { $('eErr').textContent = r.error; return; }
+      if (Object.keys(r.patch).length) { await api.editUnit(id, r.patch); u.edited = true; }
+      d.close(); render();
+    };
+  }
+
   /* In-page confirmation: window.confirm() leaves text inputs unable to take focus in Electron on Windows, which stopped scanning. */
   function confirmDialog(text) {
     return new Promise((resolve) => {
@@ -303,7 +324,20 @@
     q('[data-cmd]', (el) => { onScan(Codes.commandCode(el.dataset.cmd)); });
     q('[data-verdict]', (el) => { onScan(Codes.commandCode(el.dataset.verdict)); });
     const lp = $('locPick');
-    if (lp) lp.onchange = () => { const v = lp.value; lp.blur(); if (v) onScan(Codes.locationCode(v)); setTimeout(keepFocus, 0); };
+    if (lp) {
+      lp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); lp.blur(); } };
+      lp.oninput = (e) => { if ((!e.inputType || e.inputType === 'insertReplacementText') && flow.knownLocation(lp.value)) lp.blur(); };
+      lp.onchange = () => {
+        const v = lp.value.trim(); lp.value = '';
+        if (!v) return;
+        if (Codes.parse(v)) { onScan(v); return; }
+        const loc = flow.resolveLocation(v);
+        if (loc) onScan(Codes.locationCode(loc));
+        else { const n = flow.matchLocations(v).length; setMsg('warn', n ? n + ' locations match "' + v + '" - type more' : 'No location matches "' + v + '"'); }
+        setTimeout(keepFocus, 0);
+      };
+    }
+    q('[data-edit]', (el) => editDialog(el.dataset.edit));
     q('[data-sheet]', (el) => { sheetTab = el.dataset.sheet; render(); });
     q('[data-shelf]', (el) => { if (el.checked) hiddenShelves.delete(el.dataset.shelf); else hiddenShelves.add(el.dataset.shelf); saveHidden(); render(); });
     q('[data-shelves]', (el) => { hiddenShelves = el.dataset.shelves === 'all' ? new Set() : new Set(shelfList()); saveHidden(); render(); });

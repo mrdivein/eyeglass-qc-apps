@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('qcApi', {
   setDraft: call('draft:set'),
   units: call('units:list'),
   saveUnit: call('units:save'),
+  editUnit: call('units:edit'),
   voidUnit: call('units:void'),
   exportCopy: call('export:copy'),
   exportFile: call('export:file'),

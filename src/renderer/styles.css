@@ -56,7 +56,9 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .field { display: flex; align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 .field label { width: 90px; color: var(--muted); font-weight: 600; }
 .field .val { font-size: 22px; font-weight: 800; }
-.locpick { margin-left: auto; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; min-width: 200px; }
+.locpick { margin-left: auto; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; min-width: 260px; }
+dialog select { width: 100%; padding: 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; }
+dialog .err { color: #b42318; font-weight: 600; min-height: 1.2em; margin-top: 10px; }
 .locrow { margin-top: 10px; font-weight: 600; color: var(--muted); }
 .locrow .locpick { margin-left: 8px; }
 .field .val.empty { color: #a0a7b4; font-weight: 500; }

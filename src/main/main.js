@@ -48,6 +48,7 @@ function register() {
   ipcMain.handle('draft:set', (_e, d) => { store.saveDraft(d); return true; });
   ipcMain.handle('units:list', () => store.units());
   ipcMain.handle('units:save', (_e, rec) => { store.saveUnit(rec); return true; });
+  ipcMain.handle('units:edit', (_e, id, patch) => { store.editUnit(id, patch); return true; });
   ipcMain.handle('units:void', (_e, id) => { store.voidUnit(id); return true; });
 
   const pick = (all) => store.units().filter((u) => !u.voided && (all || !u.exportedBatch));
