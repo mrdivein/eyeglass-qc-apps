@@ -159,7 +159,8 @@
       const hits = u.defects.filter((x) => x.area === a.key);
       return '<div class="area' + (hits.length ? ' hit' : '') + '"><b>' + esc(a.label) + '</b>' + hits.map((h) => '<span>' + esc(h.defect) + '</span>').join('') + '</div>';
     }).join('');
-    const issue = u.defects.length > 0;
+    const needVerdict = !u.verdict && u.defects.length > 0;
+    const verdicts = Codes.VERDICTS.map((v) => '<button class="verdict ' + v.key.toLowerCase() + (u.verdict === v.key ? ' on' : '') + '" data-verdict="' + v.key + '">' + esc(v.label) + '</button>').join('');
     return '<div class="unit"><div class="card prod">' + (l.image ? '<img src="' + esc(l.image) + '" alt="" onerror="this.remove()">' : '') +
       '<div class="brand2">' + esc(l.brand) + '</div><div class="model">' + esc(l.model) + '</div>' +
       '<dl><dt>SKU</dt><dd>' + esc(l.sku) + '</dd><dt>Color</dt><dd>' + esc(l.color) + '</dd><dt>Type</dt><dd>' + esc(l.type) + '</dd><dt>UPC</dt><dd>' + esc(l.upc) + '</dd></dl>' +
@@ -167,7 +168,7 @@
       '<div class="card"><div class="field"><label>S/N</label><div class="val' + (u.serial ? '' : ' empty') + '">' + esc(u.serial || 'scan S/N') + '</div></div>' +
       '<div class="field"><label>Location</label><div class="val' + (flow.state.location ? '' : ' empty') + '">' + esc(flow.state.location || 'scan location') + '</div></div>' +
       '<div class="areas">' + areas + '</div>' +
-      '<div class="result ' + (issue ? 'issue' : 'pass') + '">' + (issue ? 'ISSUE - HOLD' : 'PASS') + '</div>' +
+      '<div class="verdicts' + (needVerdict ? ' need' : '') + '">' + verdicts + '</div>' +
       '<div class="btns"><button class="primary" data-cmd="SAVE">Save</button><button data-cmd="BACK">Back</button><button data-cmd="REDO">Redo</button><button data-cmd="UNDO">Undo</button></div></div></div>';
   }
 
@@ -175,7 +176,7 @@
   function logHtml() {
     const us = flow.saved.slice().reverse().filter((u) => logAll || !u.exportedBatch);
     const rows = us.map((u) => '<tr><td>' + esc(new Date(u.savedAt).toLocaleString()) + '</td><td>' + esc(u.shipment) + '</td><td>' + esc(u.upc) + '</td><td>' + esc(u.sku) +
-      '</td><td>' + esc(u.serial) + '</td><td>' + esc(u.result) + '</td><td>' + esc(u.note) + '</td><td>' + esc(u.location) +
+      '</td><td>' + esc(u.serial) + '</td><td>' + esc(u.verdict || u.result) + '</td><td>' + esc(u.note) + '</td><td>' + esc(u.location) +
       '</td><td>' + (u.exportedBatch ? 'exported' : '') + '</td><td><button class="danger" data-void="' + esc(u.id) + '">Delete</button></td></tr>').join('');
     return '<div class="toolbar"><button id="btnCopy" class="primary">Copy rows</button><button id="btnFile">Save CSV</button>' +
       '<label><input type="checkbox" id="chkAll"' + (logAll ? ' checked' : '') + '> Include exported</label>' +
@@ -213,7 +214,8 @@
       const pages = defectPages();
       body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>QC defects</h1>' + pg.map(areaSection).join('') + '</div>').join('');
     } else if (sheetTab === 'commands') {
-      body = '<div class="sheet"><h1>QC commands</h1><div class="codes cmd">' + Codes.COMMANDS.map((c) => codeCell(c.label.toUpperCase(), Codes.commandCode(c.key))).join('') + '</div></div>';
+      body = '<div class="sheet page-break"><h1>QC commands</h1><div class="codes cmd">' + Codes.COMMANDS.map((c) => codeCell(c.label.toUpperCase(), Codes.commandCode(c.key))).join('') + '</div></div>' +
+        '<div class="sheet"><h1>QC verdict</h1><div class="codes cmd">' + Codes.VERDICTS.map((v) => codeCell(v.label.toUpperCase(), Codes.commandCode(v.key))).join('') + '</div></div>';
     } else {
       const locs = flow.data.locations;
       const per = 24, pages = [];
@@ -250,6 +252,7 @@
     const q = (sel, fn) => document.querySelectorAll(sel).forEach((el) => { el.onclick = () => fn(el); });
     q('[data-ship]', (el) => { showMsg(flow.openShipment(el.dataset.ship)); render(); });
     q('[data-cmd]', (el) => { onScan(Codes.commandCode(el.dataset.cmd)); });
+    q('[data-verdict]', (el) => { onScan(Codes.commandCode(el.dataset.verdict)); });
     q('[data-sheet]', (el) => { sheetTab = el.dataset.sheet; render(); });
     q('[data-void]', async (el) => {
       if (!window.confirm('Delete this saved unit?')) return;

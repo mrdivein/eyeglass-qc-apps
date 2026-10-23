@@ -47,7 +47,7 @@ test('defects make it ISSUE/HOLD and toggle off when scanned again', () => {
   f.scan('100000000001'); f.scan(D('LENS', 'Scratch')); f.scan(D('TEMPLEL', 'Scratch')); f.scan(D('FRONT', 'Dent'));
   f.scan(D('FRONT', 'Dent'));                       // toggled off
   f.scan(D('TEMPLER', 'Deformation'));
-  f.scan('LOC-01'); f.scan(C('SAVE'));
+  f.scan('LOC-01'); f.scan(C('POLISH')); f.scan(C('SAVE'));
   assert.strictEqual(out[0].result, 'ISSUE');
   assert.strictEqual(out[0].condition, 'HOLD');
   assert.strictEqual(out[0].note, 'Scratch: Lens, Temple Left; Deformation: Temple Right');
@@ -154,10 +154,11 @@ test('configure replaces the vocabulary and the codes follow it', () => {
 
 test('result values come from the configured hooks', () => {
   const out = [];
-  const f = new Flow(data(), [], { save: (r) => out.push(r), values: { pass: { result: 'GOOD', condition: 'FREE' }, issue: { result: 'BAD', condition: 'KEEP' } } });
+  const f = new Flow(data(), [], { save: (r) => out.push(r), values: { PASS: { result: 'GOOD', condition: 'FREE' }, POLISH: { result: 'BAD', condition: 'KEEP' }, DEFECT: { result: 'WORSE', condition: 'DROP' } } });
   f.openShipment('LOT-1'); f.scan('100000000001'); f.scan('LOC-01'); f.scan(C('SAVE'));
-  f.scan('100000000001'); f.scan(D('LENS', 'Scratch')); f.scan(C('SAVE'));
-  assert.deepStrictEqual(out.map((r) => [r.result, r.condition]), [['GOOD', 'FREE'], ['BAD', 'KEEP']]);
+  f.scan('100000000001'); f.scan(D('LENS', 'Scratch')); f.scan(C('POLISH')); f.scan(C('SAVE'));
+  f.scan('100000000001'); f.scan(C('DEFECT')); f.scan(C('SAVE'));
+  assert.deepStrictEqual(out.map((r) => [r.verdict, r.result, r.condition]), [['PASS', 'GOOD', 'FREE'], ['POLISH', 'BAD', 'KEEP'], ['DEFECT', 'WORSE', 'DROP']]);
 });
 
 test('snapshot and restore bring back shipment, location and the unfinished unit', () => {
@@ -167,6 +168,7 @@ test('snapshot and restore bring back shipment, location and the unfinished unit
   const g = new Flow(data(), [], {});
   assert.strictEqual(g.restore(snap), true);
   assert.deepStrictEqual([g.state.screen, g.state.shipmentId, g.state.location, g.state.unit.serial, g.state.unit.defects.length], ['UNIT', 'LOT-1', 'LOC-02', 'SN-9', 1]);
+  g.scan(C('POLISH'));
   assert.strictEqual(g.scan(C('SAVE')).kind, 'ok');
 });
 
@@ -178,4 +180,34 @@ test('restore without a unit lands on the scan screen; stale or empty snapshots 
   assert.deepStrictEqual([g.state.screen, g.state.location], ['SCAN', 'LOC-01']);
   assert.strictEqual(new Flow(data(), [], {}).restore({ shipmentId: 'GONE' }), false);
   assert.strictEqual(new Flow(data(), [], {}).restore(null), false);
+});
+
+test('defects need a verdict before SAVE; a clean unit defaults to PASS', () => {
+  const { f, out } = setup();
+  f.scan('100000000001'); f.scan('LOC-01'); f.scan(D('LENS', 'Scratch'));
+  assert.strictEqual(f.scan(C('SAVE')).kind, 'err');
+  assert.strictEqual(out.length, 0);
+  f.scan(C('POLISH'));
+  assert.strictEqual(f.scan(C('SAVE')).kind, 'ok');
+  assert.deepStrictEqual([out[0].verdict, out[0].result, out[0].condition], ['POLISH', 'ISSUE', 'HOLD']);
+  f.scan('100000000002'); f.scan(C('SAVE'));
+  assert.deepStrictEqual([out[1].verdict, out[1].result], ['PASS', 'PASS']);
+});
+
+test('verdict can be changed, UNDO clears it first, REDO clears everything', () => {
+  const { f } = setup();
+  f.scan('100000000001'); f.scan('SN-1'); f.scan(D('LENS', 'Scratch')); f.scan(C('POLISH')); f.scan(C('DEFECT'));
+  assert.strictEqual(f.state.unit.verdict, 'DEFECT');
+  f.scan(C('UNDO'));
+  assert.deepStrictEqual([f.state.unit.verdict, f.state.unit.defects.length], [null, 1]);
+  f.scan(C('PASS')); f.scan(C('REDO'));
+  assert.deepStrictEqual([f.state.unit.verdict, f.state.unit.serial, f.state.unit.defects.length], [null, '', 0]);
+});
+
+test('a verdict scan outside a unit is refused; a verdict alone counts as touched', () => {
+  const { f } = setup();
+  assert.strictEqual(f.scan(C('DEFECT')).kind, 'warn');
+  f.scan('100000000001'); f.scan(C('DEFECT'));
+  assert.strictEqual(f.scan(C('BACK')).kind, 'warn');
+  assert.strictEqual(f.state.screen, 'UNIT');
 });

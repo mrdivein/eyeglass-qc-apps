@@ -62,6 +62,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .area.hit { border-color: var(--err); background: #fff5f4; }
 .area b { display: block; font-size: 13px; color: var(--muted); }
 .area span { display: inline-block; margin: 3px 4px 0 0; padding: 2px 8px; border-radius: 6px; background: var(--err); color: #fff; font-weight: 700; font-size: 14px; }
+.verdicts { display: flex; gap: 8px; margin-top: 4px; padding: 6px; border-radius: 10px; border: 2px solid transparent; }
+.verdicts.need { border-color: var(--err); background: #fff5f4; }
+.verdict { flex: 1; padding: 14px 8px; font-weight: 800; font-size: 16px; border-width: 2px; }
+.verdict.pass.on { background: var(--ok); border-color: var(--ok); color: #fff; }
+.verdict.polish.on { background: var(--warn); border-color: var(--warn); color: #fff; }
+.verdict.defect.on { background: var(--err); border-color: var(--err); color: #fff; }
 .result { font-size: 20px; font-weight: 800; }
 .result.pass { color: var(--ok); } .result.issue { color: var(--err); }
 .btns { display: flex; gap: 8px; margin-top: 8px; }

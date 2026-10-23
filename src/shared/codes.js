@@ -23,7 +23,14 @@
     { key: 'UNDO', label: 'Undo' }
   ];
 
-  const api = { PREFIX: PREFIX, COMMANDS: COMMANDS, AREAS: DEFAULT_AREAS, DEFECTS: DEFAULT_DEFECTS };
+  /* Final conclusion for a unit. Scanned like a command; the data endpoint maps each one to the exported values. */
+  const VERDICTS = [
+    { key: 'PASS', label: 'Pass' },
+    { key: 'POLISH', label: 'Need polish / adjust' },
+    { key: 'DEFECT', label: 'Defect' }
+  ];
+
+  const api = { PREFIX: PREFIX, COMMANDS: COMMANDS, VERDICTS: VERDICTS, AREAS: DEFAULT_AREAS, DEFECTS: DEFAULT_DEFECTS };
 
   const slug = function (s) { return String(s).toUpperCase().replace(/[^A-Z0-9]/g, ''); };
 
@@ -41,15 +48,17 @@
   api.areaByKey = function (k) { return api.AREAS.filter(function (a) { return a.key === k; })[0] || null; };
   api.defectCode = function (areaKey, defect) { return PREFIX + '-D-' + areaKey + '-' + slug(defect); };
   api.commandCode = function (cmd) { return PREFIX + '-C-' + cmd; };
+  api.verdictByKey = function (k) { return VERDICTS.filter(function (v) { return v.key === k; })[0] || null; };
   api.locationCode = function (loc) { return PREFIX + '-L-' + String(loc).toUpperCase(); };
 
-  /** Token → {type:'command',cmd} | {type:'defect',area,defect} | {type:'location',location} | {type:'unknown'} | null (not ours). */
+  /** Token → {type:'command',cmd} | {type:'verdict',verdict} | {type:'defect',area,defect} | {type:'location',location} | {type:'unknown'} | null (not ours). */
   api.parse = function (token) {
     const t = String(token || '').trim().toUpperCase();
     if (t.indexOf(PREFIX + '-') !== 0) return null;
     const rest = t.slice(PREFIX.length + 1);
     if (rest.indexOf('C-') === 0) {
       const c = rest.slice(2);
+      if (VERDICTS.some(function (x) { return x.key === c; })) return { type: 'verdict', verdict: c };
       return COMMANDS.some(function (x) { return x.key === c; }) ? { type: 'command', cmd: c } : { type: 'unknown', raw: t };
     }
     if (rest.indexOf('L-') === 0) return { type: 'location', location: rest.slice(2) };

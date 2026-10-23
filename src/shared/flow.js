@@ -4,14 +4,14 @@
   else root.QCFlow = factory(root.QCCodes);
 })(typeof self !== 'undefined' ? self : this, function (Codes) {
   const normUpc = function (s) { return String(s || '').replace(/\D/g, '').replace(/^0+/, ''); };
-  const DEFAULT_VALUES = { pass: { result: 'PASS', condition: 'OK' }, issue: { result: 'ISSUE', condition: 'HOLD' } };
+  const DEFAULT_VALUES = { PASS: { result: 'PASS', condition: 'OK' }, POLISH: { result: 'ISSUE', condition: 'HOLD' }, DEFECT: { result: 'ISSUE', condition: 'DEFECT' } };
   const isUpcLike = function (s) { return /^\d{8,14}$/.test(String(s).trim()); };
 
   class Flow {
     /**
      * data:   { shipments: [{ id, name, status, lines: [{ upc, sku, brand, model, color, type, image, qty, received }] }], locations: [] }
      * saved:  saved unit records (to restore counters and S/N duplicate checks)
-     * hooks:  { save(rec), operator, values: { pass: { result, condition }, issue: { result, condition } } }
+     * hooks:  { save(rec), operator, values: { PASS|POLISH|DEFECT: { result, condition } } }
      */
     constructor(data, saved, hooks) {
       this.data = data || { shipments: [], locations: [] };
@@ -53,10 +53,10 @@
       Object.assign(this.state, { screen: 'SCAN', shipmentId: id, unit: null, pendingBack: false });
       return this.msg('info', 'Scan UPC');
     }
-    unitTouched() { const u = this.state.unit; return !!u && (u.serial !== '' || u.defects.length > 0); }
+    unitTouched() { const u = this.state.unit; return !!u && (u.serial !== '' || u.defects.length > 0 || !!u.verdict); }
 
     openUnit(line) {
-      this.state.unit = { upc: line.upc, line: line, serial: '', defects: [] };
+      this.state.unit = { upc: line.upc, line: line, serial: '', defects: [], verdict: null };
       this.state.screen = 'UNIT';
       this.state.pendingBack = false;
       const d = this.done(line);
@@ -74,6 +74,7 @@
       const p = Codes.parse(tok);
       if (p) {
         if (p.type === 'command') return this.command(p.cmd);
+        if (p.type === 'verdict') return this.verdict(p.verdict);
         if (p.type === 'defect') return this.defect(p);
         if (p.type === 'location') return this.setLocation(p.location);
         return this.msg('err', 'Unknown code ' + p.raw);
@@ -113,6 +114,13 @@
       return this.msg('ok', label);
     }
 
+    verdict(v) {
+      const st = this.state;
+      if (st.screen !== 'UNIT') return this.msg('warn', 'Scan a UPC first');
+      st.unit.verdict = v; st.pendingBack = false;
+      return this.msg(v === 'PASS' ? 'ok' : 'warn', Codes.verdictByKey(v).label);
+    }
+
     setLocation(loc) {
       this.state.location = String(loc).toUpperCase();
       if (!this.knownLocation(this.state.location)) {
@@ -126,11 +134,12 @@
       if (cmd === 'SAVE') return this.save();
       if (cmd === 'REDO') {
         if (st.screen !== 'UNIT') return this.msg('warn', 'Nothing to redo');
-        st.unit.serial = ''; st.unit.defects = []; st.pendingBack = false;
+        st.unit.serial = ''; st.unit.defects = []; st.unit.verdict = null; st.pendingBack = false;
         return this.msg('info', 'Unit cleared');
       }
       if (cmd === 'UNDO') {
         if (st.screen !== 'UNIT') return this.msg('warn', 'Nothing to undo');
+        if (st.unit.verdict) { st.unit.verdict = null; return this.msg('info', 'Verdict cleared'); }
         if (st.unit.defects.length) { const d = st.unit.defects.pop(); return this.msg('info', 'Removed ' + Codes.areaByKey(d.area).label + ': ' + d.defect); }
         if (st.unit.serial) { st.unit.serial = ''; return this.msg('info', 'S/N cleared'); }
         return this.msg('warn', 'Nothing to undo');
@@ -151,8 +160,10 @@
       const st = this.state;
       if (st.screen !== 'UNIT') return this.msg('warn', 'Scan a UPC first');
       if (!st.location) return this.msg('err', 'Scan a location before SAVE');
-      const u = st.unit, issue = u.defects.length > 0;
-      const v = (this.hooks.values || DEFAULT_VALUES)[issue ? 'issue' : 'pass'];
+      const u = st.unit;
+      if (!u.verdict && u.defects.length) return this.msg('err', 'Scan the verdict: PASS, NEED POLISH or DEFECT');
+      const verdict = u.verdict || 'PASS';
+      const v = (this.hooks.values && this.hooks.values[verdict]) || DEFAULT_VALUES[verdict];
       const rec = {
         id: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
         shipment: st.shipmentId,
@@ -161,6 +172,7 @@
         serial: u.serial,
         defects: u.defects.slice(),
         note: Codes.noteText(u.defects),
+        verdict: verdict,
         result: v.result,
         condition: v.condition,
         location: st.location,
@@ -170,7 +182,7 @@
       this.saved.push(rec);
       if (this.hooks.save) this.hooks.save(rec);
       st.unit = null; st.screen = 'SCAN'; st.pendingBack = false;
-      return this.msg('ok', 'Saved ' + u.line.model + (issue ? ' (ISSUE)' : ' (PASS)'));
+      return this.msg('ok', 'Saved ' + u.line.model + ' (' + Codes.verdictByKey(verdict).label.toUpperCase() + ')');
     }
 
     /** Unfinished work as plain data (written to disk after every scan so a power cut loses nothing). */
@@ -178,7 +190,7 @@
       const st = this.state, u = st.unit;
       return {
         shipmentId: st.shipmentId, location: st.location,
-        unit: u ? { upc: u.upc, serial: u.serial, defects: u.defects.slice() } : null
+        unit: u ? { upc: u.upc, serial: u.serial, defects: u.defects.slice(), verdict: u.verdict || null } : null
       };
     }
 
@@ -189,7 +201,7 @@
       this.openShipment(snap.shipmentId);
       const line = snap.unit && this.findLine(snap.unit.upc);
       if (line) {
-        this.state.unit = { upc: line.upc, line: line, serial: snap.unit.serial || '', defects: (snap.unit.defects || []).filter(function (d) { return Codes.areaByKey(d.area); }) };
+        this.state.unit = { upc: line.upc, line: line, serial: snap.unit.serial || '', verdict: snap.unit.verdict || null, defects: (snap.unit.defects || []).filter(function (d) { return Codes.areaByKey(d.area); }) };
         this.state.screen = 'UNIT';
         this.msg('warn', 'Restored your unfinished unit - SAVE or REDO');
       } else {

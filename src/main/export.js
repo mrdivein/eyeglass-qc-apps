@@ -1,6 +1,6 @@
 /* Saved QC units → rows for pasting into the records sheet, as TSV, or as a CSV file.
  * Column heads and order come from the data endpoint (cfg.columns: [{ head, field }]). */
-const FIELDS = ['id', 'date', 'shipment', 'upc', 'sku', 'serial', 'result', 'note', 'condition', 'location', 'operator'];
+const FIELDS = ['id', 'date', 'shipment', 'upc', 'sku', 'serial', 'result', 'verdict', 'note', 'condition', 'location', 'operator'];
 const DEFAULT_CONFIG = { columns: FIELDS.map((f) => ({ head: f, field: f })), idPrefix: '', idWidth: 0 };
 
 function ddmmyyyy(iso) {
