@@ -22,8 +22,8 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - run: npm test
 
-  # Merge vào main với version mới trong package.json thì build bộ cài Windows và đăng lên GitHub Releases.
-  # App đã cài tự thấy bản mới (electron-updater). Version đã có release thì bỏ qua.
+  # A new version in package.json on main builds the Windows installer and publishes it to GitHub Releases.
+  # Installed apps pick it up through electron-updater. A version that already has a release is skipped.
   release:
     needs: test
     if: github.event_name != 'pull_request'
@@ -33,7 +33,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Version đã phát hành chưa
+      - name: Check whether this version is already released
         id: ver
         shell: bash
         run: |
