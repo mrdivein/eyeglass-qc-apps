@@ -58,6 +58,12 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .field .val { font-size: 22px; font-weight: 800; }
 .locpick { margin-left: auto; padding: 6px 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; min-width: 260px; }
 dialog select { width: 100%; padding: 8px; font: inherit; border: 1px solid var(--line); border-radius: 6px; }
+dialog { max-height: 92vh; overflow: auto; }
+.dsel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.darea { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.darea b { display: block; margin-bottom: 4px; }
+dialog label.dchk { display: block; margin: 2px 0; font-weight: 500; font-size: 14px; }
+.dchk input { margin-right: 6px; }
 dialog .err { color: #b42318; font-weight: 600; min-height: 1.2em; margin-top: 10px; }
 .locrow { margin-top: 10px; font-weight: 600; color: var(--muted); }
 .locrow .locpick { margin-left: 8px; }

@@ -95,7 +95,7 @@
   document.addEventListener('click', () => setTimeout(keepFocus, 0));
   setInterval(keepFocus, 1500);
   window.addEventListener('focus', () => setTimeout(keepFocus, 0));
-  $('dlg').addEventListener('close', () => setTimeout(keepFocus, 0));
+  $('dlg').addEventListener('close', () => { $('dlg').style.minWidth = ''; setTimeout(keepFocus, 0); });
 
   /* ---------- render ---------- */
   let lastDraft = '';
@@ -269,14 +269,17 @@
       '<label>Location</label><input type="text" id="eLoc" list="locList" autocomplete="off" spellcheck="false" value="' + esc(u.location) + '">' + locListHtml() +
       '<label>S/N</label><input type="text" id="eSn" autocomplete="off" spellcheck="false" value="' + esc(u.serial) + '">' +
       '<label>Result</label><select id="eVer">' + vopts + '</select>' +
-      '<label>Defects</label><input type="text" id="eNote" autocomplete="off" value="' + esc(u.note) + '">' +
+      '<label>Defects</label><div class="dsel">' + Codes.AREAS.map((a) => '<div class="darea"><b>' + esc(a.label) + '</b>' + Codes.DEFECTS[a.key].map((x) =>
+        '<label class="dchk"><input type="checkbox" data-area="' + a.key + '" data-defect="' + esc(x) + '"' + ((u.defects || []).some((d) => d.area === a.key && d.defect === x) ? ' checked' : '') + '> ' + esc(x) + '</label>').join('') + '</div>').join('') + '</div>' +
       '<div class="err" id="eErr"></div>' +
       '<div class="row"><button id="eCancel">Cancel</button><button id="eSave" class="primary">Save changes</button></div>';
+    d.style.minWidth = '800px';
     d.showModal();
     $('eLoc').select();
     $('eCancel').onclick = () => { d.close(); };
     $('eSave').onclick = async () => {
-      const r = flow.editSaved(id, { location: $('eLoc').value, serial: $('eSn').value, verdict: $('eVer').value, note: $('eNote').value });
+      const r = flow.editSaved(id, { location: $('eLoc').value, serial: $('eSn').value, verdict: $('eVer').value,
+        defects: Array.from(d.querySelectorAll('input[data-area]:checked')).map((c) => ({ area: c.dataset.area, defect: c.dataset.defect })) });
       if (!r.ok) { $('eErr').textContent = r.error; return; }
       if (Object.keys(r.patch).length) { await api.editUnit(id, r.patch); u.edited = true; }
       d.close(); render();

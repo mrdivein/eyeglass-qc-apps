@@ -252,3 +252,15 @@ test('location search and editing of saved units', () => {
   assert.equal(f.saved[0].location, 'A-04-03-01-B2');
   assert.deepEqual(f.editSaved('u1', {}).patch, {});
 });
+
+test('editing the defects of a saved unit rebuilds the note and ignores unknown defects', () => {
+  const f = new Flow({ shipments: [], locations: ['A-01'] }, [
+    { id: 'u1', shipment: 'S', serial: 'SN1', location: 'A-01', verdict: 'POLISH', defects: [{ area: 'LENS', defect: 'Scratch' }], note: 'Scratch: Lens' }
+  ], {});
+  const same = f.editSaved('u1', { defects: [{ area: 'LENS', defect: 'Scratch' }] });
+  assert.deepEqual(same.patch, {});
+  const r = f.editSaved('u1', { defects: [{ area: 'LENS', defect: 'Scratch' }, { area: 'FRONT', defect: 'Dent' }, { area: 'FRONT', defect: 'Nonsense' }] });
+  assert.equal(r.patch.defects.length, 2);
+  assert.equal(r.patch.note, 'Scratch: Lens; Dent: Front Frame');
+  assert.equal(f.editSaved('u1', { defects: [] }).patch.note, '');
+});

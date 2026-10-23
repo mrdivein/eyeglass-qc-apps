@@ -249,7 +249,14 @@
         const v = (this.hooks.values && this.hooks.values[f.verdict]) || DEFAULT_VALUES[f.verdict];
         patch.verdict = f.verdict; patch.result = v.result; patch.condition = v.condition;
       }
-      if (f.note !== undefined && String(f.note).trim() !== (u.note || '')) patch.note = String(f.note).trim();
+      if (f.defects !== undefined) {
+        const key = function (d) { return d.area + '|' + d.defect; };
+        const next = f.defects.filter(function (d) { return Codes.areaByKey(d.area) && (Codes.DEFECTS[d.area] || []).indexOf(d.defect) >= 0; });
+        if (next.map(key).sort().join(';') !== (u.defects || []).map(key).sort().join(';')) {
+          patch.defects = next.map(function (d) { return { area: d.area, defect: d.defect }; });
+          patch.note = Codes.noteText(next);
+        }
+      } else if (f.note !== undefined && String(f.note).trim() !== (u.note || '')) patch.note = String(f.note).trim();
       Object.assign(u, patch);
       return { ok: true, patch: patch, warning: warning };
     }

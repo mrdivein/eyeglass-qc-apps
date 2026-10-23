@@ -1,7 +1,7 @@
 {
   "name": "qc-scan",
   "productName": "QC Scan",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Scanner-first QC desktop app",
   "main": "src/main/main.js",
   "author": "mrdivein",
