@@ -4,7 +4,7 @@
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const Codes = window.QCCodes, Code128 = window.QCCode128;
 
-  let flow = null, settings = {}, view = 'flow', showClosed = false, sheetTab = 'defects', hiddenShelves = loadHidden(), logAll = false, updateState = null;
+  let flow = null, settings = {}, view = 'flow', showClosed = false, sheetTab = 'defects', hiddenShelves = loadHidden(), logAll = false, updateState = null, manualCheck = false;
   const lastScans = [];
 
   /* ---------- feedback ---------- */
@@ -115,10 +115,12 @@
 
   function renderUpdate() {
     const b = $('updateBar');
-    if (!updateState || updateState.state === 'current' || updateState.state === 'checking' || updateState.state === 'dev') { b.hidden = true; return; }
+    const quiet = !updateState || ['current', 'checking', 'dev'].indexOf(updateState.state) >= 0;
+    if (quiet && !(manualCheck && updateState)) { b.hidden = true; return; }
+    if (quiet && updateState.state === 'current') setTimeout(() => { manualCheck = false; renderUpdate(); }, 6000);
     b.hidden = false;
     b.className = updateState.state === 'ready' ? 'ready' : '';
-    b.innerHTML = esc(updateState.text) + (updateState.state === 'ready' ? ' <button id="btnRestart">Restart now</button>' : '');
+    b.innerHTML = esc(updateState.state === 'current' ? 'You have the latest version (' + (window.__ver || '') + ')' : updateState.text) + (updateState.state === 'ready' ? ' <button id="btnRestart">Restart now</button>' : '');
     const r = $('btnRestart');
     if (r) r.onclick = () => api.installUpdate();
   }
@@ -246,7 +248,7 @@
       '<div class="row"><button id="sUpd">Check for updates</button><span class="grow"></span><button id="sCancel">Cancel</button><button id="sSave" class="primary">Save</button></div>';
     d.showModal();
     $('sCancel').onclick = () => { d.close(); keepFocus(); };
-    $('sUpd').onclick = async () => { await api.checkUpdate(); d.close(); };
+    $('sUpd').onclick = async () => { manualCheck = true; updateState = { state: 'checking', text: 'Checking for updates' }; d.close(); renderUpdate(); await api.checkUpdate(); };
     $('sSave').onclick = async () => {
       settings = await api.setSettings({ apiUrl: $('sUrl').value, apiKey: $('sKey').value, operator: $('sOp').value, updateToken: $('sTok').value });
       flow.hooks.operator = settings.operator;
