@@ -111,9 +111,10 @@
     serial(tok) {
       const st = this.state;
       const dup = this.saved.filter(function (u) { return u.serial && u.serial === tok; })[0];
-      if (dup) return this.msg('err', 'S/N ' + tok + ' already saved (' + dup.shipment + ')');
       st.unit.serial = tok;
       st.pendingBack = false;
+      /* Some brands repeat serials within a lot, so a repeat is only a warning. */
+      if (dup) return this.msg('warn', 'Duplicate S/N ' + tok + ' - already saved (' + dup.shipment + ')');
       return this.msg('ok', 'S/N ' + tok);
     }
 
@@ -229,6 +230,7 @@
       const u = this.saved.find(function (x) { return x.id === id; });
       if (!u) return { ok: false, error: 'Unit not found' };
       const patch = {};
+      let warning = '';
       if (f.location !== undefined) {
         const loc = this.resolveLocation(f.location);
         if (!loc) return { ok: false, error: 'Location "' + String(f.location).trim() + '" is not in the location list' };
@@ -238,7 +240,7 @@
         const sn = String(f.serial).trim();
         if (sn !== (u.serial || '')) {
           const dup = this.saved.filter(function (x) { return x.id !== id && x.serial && x.serial === sn; })[0];
-          if (sn && dup) return { ok: false, error: 'S/N ' + sn + ' already saved (' + dup.shipment + ')' };
+          if (sn && dup) warning = 'Duplicate S/N ' + sn + ' - already saved (' + dup.shipment + ')';
           patch.serial = sn;
         }
       }
@@ -249,7 +251,7 @@
       }
       if (f.note !== undefined && String(f.note).trim() !== (u.note || '')) patch.note = String(f.note).trim();
       Object.assign(u, patch);
-      return { ok: true, patch: patch };
+      return { ok: true, patch: patch, warning: warning };
     }
 
     /** Remove a saved unit (UI action, e.g. wrong scan). */

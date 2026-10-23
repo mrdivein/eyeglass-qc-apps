@@ -100,12 +100,16 @@ test('a UPC scanned on a touched unit is refused, not taken as S/N', () => {
   assert.strictEqual(f.state.unit.line.upc, '100000000001');
 });
 
-test('duplicate S/N is refused', () => {
+test('duplicate S/N only warns and is still taken', () => {
   const { f } = setup();
   f.scan('100000000001'); f.scan('SN-1'); f.scan('LOC-01'); f.scan(C('SAVE'));
   f.scan('100000000001');
-  assert.strictEqual(f.scan('SN-1').kind, 'err');
-  assert.strictEqual(f.state.unit.serial, '');
+  const m = f.scan('SN-1');
+  assert.strictEqual(m.kind, 'warn');
+  assert.ok(/Duplicate S\/N SN-1/.test(m.text));
+  assert.strictEqual(f.state.unit.serial, 'SN-1');
+  f.scan(C('SAVE'));
+  assert.strictEqual(f.saved.filter((u) => u.serial === 'SN-1').length, 2);
 });
 
 test('progress counts rows already recorded plus saved ones, and warns when over', () => {
@@ -240,7 +244,9 @@ test('location search and editing of saved units', () => {
   assert.equal(f.resolveLocation('a-04-03'), null);
   assert.equal(f.resolveLocation('hold'), 'HOLD');
   assert.equal(f.editSaved('u1', { location: 'zz' }).ok, false);
-  assert.equal(f.editSaved('u1', { serial: 'SN2' }).ok, false);
+  const dupEdit = f.editSaved('u1', { serial: 'SN2' });
+  assert.ok(dupEdit.ok && /Duplicate S\/N SN2/.test(dupEdit.warning));
+  f.editSaved('u1', { serial: 'SN1' });
   const r = f.editSaved('u1', { location: 'a-04-03-01-b2', serial: ' SN9 ', verdict: 'DEFECT', note: 'Scratch: Lens' });
   assert.deepEqual(r.patch, { location: 'A-04-03-01-B2', serial: 'SN9', verdict: 'DEFECT', result: 'ISSUE', condition: 'DAMAGED', note: 'Scratch: Lens' });
   assert.equal(f.saved[0].location, 'A-04-03-01-B2');

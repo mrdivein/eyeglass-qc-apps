@@ -280,6 +280,7 @@
       if (!r.ok) { $('eErr').textContent = r.error; return; }
       if (Object.keys(r.patch).length) { await api.editUnit(id, r.patch); u.edited = true; }
       d.close(); render();
+      if (r.warning) setMsg('warn', r.warning);
     };
   }
 
