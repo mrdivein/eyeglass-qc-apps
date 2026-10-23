@@ -177,29 +177,40 @@
   }
 
   /* ---------- printable code sheets (barcodes only, no instruction text) ---------- */
-  function codeCell(label, text) { return '<div class="code"><div class="lab">' + esc(label) + '</div>' + Code128.svg(text, { module: 2, height: 60 }) + '</div>'; }
-  function areaSection(a) {
-    return '<h2>' + esc(a.label) + '</h2><div class="codes">' + Codes.DEFECTS[a.key].map((d) => codeCell(d, Codes.defectCode(a.key, d))).join('') + '</div>';
+  function codeCell(label, text) { return '<div class="code"><div class="lab">' + esc(label) + '</div>' + Code128.svg(text, { module: 3, height: 80 }) + '</div>'; }
+  function areaSection(sec) {
+    return '<h2>' + esc(sec.area.label) + '</h2><div class="codes">' + sec.items.map((d) => codeCell(d, Codes.defectCode(sec.area.key, d))).join('') + '</div>';
+  }
+  /* Codes are packed into pages of PAGE_ROWS rows (2 codes per row, an area heading counts as 1 row); an area continues on the next page. */
+  const PAGE_ROWS = 8;
+  function defectPages() {
+    const pages = [[]];
+    let used = 0;
+    Codes.AREAS.forEach((a) => {
+      let left = Codes.DEFECTS[a.key].slice();
+      while (left.length) {
+        let room = PAGE_ROWS - used - 1;
+        if (room < 1) { pages.push([]); used = 0; room = PAGE_ROWS - 1; }
+        const take = left.splice(0, room * 2);
+        pages[pages.length - 1].push({ area: a, items: take });
+        used += 1 + Math.ceil(take.length / 2);
+      }
+    });
+    return pages;
   }
   function sheetsHtml() {
     const tabs = ['defects', 'commands', 'locations'].map((t) => '<button data-sheet="' + t + '" class="' + (sheetTab === t ? 'on' : '') + '">' + t[0].toUpperCase() + t.slice(1) + '</button>').join('');
     let body = '';
     if (sheetTab === 'defects') {
-      const pages = [[]];
-      let rowsUsed = 0;
-      Codes.AREAS.forEach((a) => {
-        const need = Math.ceil(Codes.DEFECTS[a.key].length / 3) + 1;
-        if (rowsUsed + need > 13 && pages[pages.length - 1].length) { pages.push([]); rowsUsed = 0; }
-        pages[pages.length - 1].push(a); rowsUsed += need;
-      });
+      const pages = defectPages();
       body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>QC defects</h1>' + pg.map(areaSection).join('') + '</div>').join('');
     } else if (sheetTab === 'commands') {
-      body = '<div class="sheet"><h1>QC commands</h1><div class="codes two cmd">' + Codes.COMMANDS.map((c) => codeCell(c.label.toUpperCase(), Codes.commandCode(c.key))).join('') + '</div></div>';
+      body = '<div class="sheet"><h1>QC commands</h1><div class="codes cmd">' + Codes.COMMANDS.map((c) => codeCell(c.label.toUpperCase(), Codes.commandCode(c.key))).join('') + '</div></div>';
     } else {
       const locs = flow.data.locations;
-      const per = 48, pages = [];
+      const per = 24, pages = [];
       for (let i = 0; i < locs.length; i += per) pages.push(locs.slice(i, i + per));
-      body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>Locations</h1><div class="codes four">' +
+      body = pages.map((pg, i) => '<div class="sheet' + (i < pages.length - 1 ? ' page-break' : '') + '"><h1>Locations</h1><div class="codes three">' +
         pg.map((l) => codeCell(l, Codes.locationCode(l))).join('') + '</div></div>').join('') || '<div class="muted">No locations. Press Sync.</div>';
     }
     return '<div class="tabs">' + tabs + '<span class="grow"></span><button id="btnPrint" class="primary">Print</button><button id="btnPdf">Save PDF</button></div>' + body;
