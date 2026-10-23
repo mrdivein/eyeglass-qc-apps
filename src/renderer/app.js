@@ -87,6 +87,9 @@
     if ($('dlg').open) return;
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA') && a !== $('scan')) return;
+    /* Text selected for copying (e.g. a cell in Saved): moving focus to the scan box would clear it. */
+    const sel = window.getSelection && window.getSelection();
+    if (sel && !sel.isCollapsed && String(sel).trim()) return;
     $('scan').focus();
   }
   document.addEventListener('click', () => setTimeout(keepFocus, 0));
