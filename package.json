@@ -1,0 +1,38 @@
+{
+  "name": "qc-scan",
+  "productName": "QC Scan",
+  "version": "0.1.0",
+  "description": "Scanner-first QC desktop app",
+  "main": "src/main/main.js",
+  "author": "mrdivein",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test \"tests/*.test.js\"",
+    "dist": "electron-builder --win --publish never",
+    "release": "electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.qcscan.app",
+    "productName": "QC Scan",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "package.json"],
+    "win": { "target": ["nsis"] },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      { "provider": "github", "owner": "mrdivein", "repo": "eyeglass-qc-apps", "releaseType": "release" }
+    ]
+  }
+}

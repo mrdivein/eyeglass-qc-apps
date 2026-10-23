@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>QC Scan</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header id="top">
+  <div class="brand">QC Scan</div>
+  <div id="crumbs"></div>
+  <div class="grow"></div>
+  <div id="locPill" class="pill" hidden></div>
+  <div id="syncInfo" class="muted"></div>
+  <button id="btnHome" class="ghost">Shipments</button>
+  <button id="btnLog" class="ghost">Saved</button>
+  <button id="btnSheets" class="ghost">Code sheets</button>
+  <button id="btnSettings" class="ghost">Settings</button>
+</header>
+<div id="updateBar" hidden></div>
+<main id="view"></main>
+<footer>
+  <div id="msg" class="msg info">Pick a shipment</div>
+  <input id="scan" type="text" autocomplete="off" spellcheck="false" placeholder="Scan or type a code">
+</footer>
+<dialog id="dlg"></dialog>
+<script src="../shared/codes.js"></script>
+<script src="../shared/code128.js"></script>
+<script src="../shared/flow.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
